@@ -10,6 +10,7 @@
 #include <vector>
 #include <limits>
 #include <cassert>
+#include <iostream>
 
 using namespace std;
 
@@ -76,6 +77,36 @@ public:
                 audioDeviceID = SDL_OpenAudioDevice(nullptr, 0, &desired, &audioSpec, SDL_AUDIO_ALLOW_FREQUENCY_CHANGE);
                 if(audioDeviceID == 0)
                     throw runtime_error(string("SDL_OpenAudioDevice failed: ") + SDL_GetError());
+                switch(audioSpec.channels)
+                {
+                case 1:
+                    cout << "Mono";
+                    break;
+                case 2:
+                    cout << "Stereo";
+                    break;
+                case 3:
+                    cout << "Triphonic";
+                    break;
+                case 4:
+                    cout << "Quadrophonic";
+                    break;
+                case 5:
+                    cout << "Pentaphonic";
+                    break;
+                case 6:
+                    cout << "5.1 surround";
+                    break;
+                case 7:
+                    cout << "6.1 surround";
+                    break;
+                case 8:
+                    cout << "7.1 surround";
+                    break;
+                default:
+                    cout << (int)audioSpec.channels << "-channel";
+                }
+                cout << " at " << audioSpec.freq / 1000.0 << "kHz\n";
                 SDL_PauseAudioDevice(audioDeviceID, SDL_FALSE);
             }
             catch(...)

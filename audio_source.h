@@ -94,7 +94,7 @@ public:
             source->advanceTime(deltaTime * scale);
             return;
         }
-        double newDeltaTime;
+        double newDeltaTime = deltaTime * scale;
         switch(scaleType)
         {
         case ScaleType::Linear:
@@ -231,6 +231,19 @@ public:
     {
         head = new SourceStruct(std::move(source), amplitude, head);
     }
+    void removeSource(std::shared_ptr<AudioSource> source)
+    {
+        for(SourceStruct **pnode = &head; *pnode != nullptr; pnode = &(*pnode)->next)
+        {
+            if((*pnode)->source == source)
+            {
+                SourceStruct *node = *pnode;
+                *pnode = node->next;
+                delete node;
+                break;
+            }
+        }
+    }
     void advanceTime(double deltaTime) override
     {
         for(SourceStruct *node = head; node != nullptr; node = node->next)
@@ -287,6 +300,19 @@ public:
     void addSource(std::shared_ptr<AudioSource> source)
     {
         head = new SourceStruct(std::move(source), head);
+    }
+    void removeSource(std::shared_ptr<AudioSource> source)
+    {
+        for(SourceStruct **pnode = &head; *pnode != nullptr; pnode = &(*pnode)->next)
+        {
+            if((*pnode)->source == source)
+            {
+                SourceStruct *node = *pnode;
+                *pnode = node->next;
+                delete node;
+                break;
+            }
+        }
     }
     void advanceTime(double deltaTime) override
     {
@@ -505,13 +531,14 @@ class SampledAudioSource : public AudioSource
 {
     std::shared_ptr<AudioData> data;
     double currentSample;
-    SampledAudioSource(std::shared_ptr<AudioData> data, double currentSample)
-        : data(std::move(data)), currentSample(currentSample)
+    float amplitude;
+    SampledAudioSource(std::shared_ptr<AudioData> data, double currentSample, float amplitude)
+        : data(std::move(data)), currentSample(currentSample), amplitude(amplitude)
     {
     }
 public:
     SampledAudioSource(std::shared_ptr<AudioData> data)
-        : data(std::move(data)), currentSample(0)
+        : data(std::move(data)), currentSample(0), amplitude(1)
     {
     }
     bool finished() const
@@ -527,8 +554,11 @@ public:
         if(!data)
             return;
         currentSample += deltaTime * data->sampleRate;
-        if(data->looped && currentSample >= data->data.size())
-            currentSample = std::fmod(currentSample - data->loopStart, data->data.size() - data->loopStart) + data->loopStart;
+        while(data->looped && currentSample >= data->data.size() && amplitude > 1e-10)
+        {
+            currentSample = currentSample + data->loopStart - data->data.size();
+            amplitude *= data->loopDecayAmplitude;
+        }
     }
     float getCurrentSample(AudioChannel channel) override
     {
@@ -536,26 +566,50 @@ public:
             return 0;
         if(finished())
             return 0;
+        if(amplitude <= 1e-10)
+            return 0;
         double floorCurrentSample = std::floor(currentSample);
         float t = currentSample - floorCurrentSample;
         std::size_t currentSampleIndex = (std::size_t)floorCurrentSample;
         std::size_t nextSampleIndex = currentSampleIndex + 1;
+        float sample1 = amplitude, sample2 = amplitude;
         if(data->looped)
         {
-            currentSampleIndex = (currentSampleIndex - data->loopStart) % (data->data.size() - data->loopStart) + data->loopStart;
-            nextSampleIndex = (nextSampleIndex - data->loopStart) % (data->data.size() - data->loopStart) + data->loopStart;
-            return t * data->data[currentSampleIndex][(size_t)channel] + (1 - t) * data->data[nextSampleIndex][(size_t)channel];
+            while(currentSampleIndex >= data->data.size())
+            {
+                sample1 *= data->loopDecayAmplitude;
+                if(sample1 < 1e-10)
+                {
+                    sample1 = 0;
+                    break;
+                }
+                currentSampleIndex = currentSampleIndex + data->loopStart - data->data.size();
+            }
+            if(sample1 != 0)
+                sample1 *= data->data[currentSampleIndex][(size_t)channel];
+            while(nextSampleIndex >= data->data.size())
+            {
+                sample2 *= data->loopDecayAmplitude;
+                if(sample2 < 1e-10)
+                {
+                    sample2 = 0;
+                    break;
+                }
+                nextSampleIndex = nextSampleIndex + data->loopStart - data->data.size();
+            }
+            if(sample2 != 0)
+                sample2 *= data->data[nextSampleIndex][(size_t)channel];
+            return t * sample1 + (1 - t) * sample2;
         }
-        float v1 = 0, v2 = 0;
         if(currentSampleIndex < data->data.size())
-            v1 = data->data[currentSampleIndex][(size_t)channel];
+            sample1 = data->data[currentSampleIndex][(size_t)channel];
         if(nextSampleIndex < data->data.size())
-            v1 = data->data[nextSampleIndex][(size_t)channel];
-        return t * v1 + (1 - t) * v2;
+            sample2 = data->data[nextSampleIndex][(size_t)channel];
+        return t * sample1 + (1 - t) * sample2;
     }
     virtual std::shared_ptr<AudioSource> duplicate() const override
     {
-        return std::shared_ptr<AudioSource>(new SampledAudioSource(data, currentSample));
+        return std::shared_ptr<AudioSource>(new SampledAudioSource(data, currentSample, amplitude));
     }
 };
 

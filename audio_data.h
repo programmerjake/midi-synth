@@ -12,7 +12,7 @@ struct AudioData
     double sampleRate;
     size_t loopStart;
     bool looped;
-    double loopDecayAmplitude;
+    float loopDecayAmplitude;
 };
 
 std::shared_ptr<AudioData> loadFromOgg(std::string fileName);

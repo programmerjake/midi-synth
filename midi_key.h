@@ -64,7 +64,7 @@ class GenericMidiKey : public MidiKey
     };
     Stage stage;
 public:
-    constexpr double InstantaneousAttack = -1;
+    static constexpr double InstantaneousAttack = -1;
     /** @brief construct a generic midi key
      *
      * @param midiKey the midi key to play
@@ -87,7 +87,7 @@ public:
     GenericMidiKey(int midiKey, int startVelocity,
                    double pitchBendSemitones, std::shared_ptr<AudioSource> source, double sourceBaseKey,
                    double attackSpeed, double decaySpeed, double sustainSpeed, double releaseSpeed, double releaseSpeedVariance,
-                   double slideSpeed, double aftertouchSpeed, float attackAmplitude, float decayAmplitude, bool ignoreAftertouch)
+                   double slideSpeed, double aftertouchSpeed, float attackAmplitude, float decayAmplitude)
         : sourceBaseKey(sourceBaseKey),
           attackSpeed(attackSpeed), decaySpeed(decaySpeed), sustainSpeed(sustainSpeed), releaseSpeed(releaseSpeed),
           releaseSpeedVariance(releaseSpeedVariance), slideSpeed(slideSpeed), aftertouchSpeed(aftertouchSpeed),
@@ -98,8 +98,8 @@ public:
 
         if(attackSpeed <= 0)
         {
-            stage = Stage::Decay;
             adsrAmplifier = std::make_shared<AmplifyAudioSource>(timeScaler, attackAmplitude);
+            stage = Stage::Decay;
             adsrAmplifier->setAmplitude(decayAmplitude, decaySpeed, AmplifyAudioSource::ScaleType::Linear);
         }
         else
@@ -120,7 +120,7 @@ public:
     {
         stage = Stage::Release;
         double effectiveSpeed = releaseSpeed * std::pow(2.0, releaseSpeedVariance * ((double)velocity / defaultVelocity - 1.0));
-        adsrAmplifier->setAmplitude(0, effectiveSpeed, AmplifyAudioSource::ScaleType::Exponential)
+        adsrAmplifier->setAmplitude(0, effectiveSpeed, AmplifyAudioSource::ScaleType::Exponential);
     }
     virtual void slideTo(int newMidiKey, int velocity) override
     {
@@ -138,11 +138,49 @@ public:
     }
     virtual float getCurrentSample(AudioChannel channel) override
     {
-        #error finish
+        return velocityAmplifier->getCurrentSample(channel);
     }
     virtual void advanceTime(double deltaTime) override
     {
-        #error finish
+        while(deltaTime > 0)
+        {
+            double stabilizeTime = adsrAmplifier->getStabilizeTime();
+            if(stabilizeTime <= deltaTime)
+            {
+                if(stabilizeTime > 1e-10)
+                {
+                    velocityAmplifier->advanceTime(stabilizeTime);
+                    deltaTime -= stabilizeTime;
+                }
+                else
+                    stabilizeTime = 0;
+                switch(stage)
+                {
+                case Stage::Attack:
+                    stage = Stage::Decay;
+                    adsrAmplifier->setAmplitude(decayAmplitude, decaySpeed, AmplifyAudioSource::ScaleType::Linear);
+                    break;
+                case Stage::Decay:
+                    stage = Stage::Sustain;
+                    adsrAmplifier->setAmplitude(0, sustainSpeed, AmplifyAudioSource::ScaleType::Exponential);
+                    break;
+                case Stage::Sustain:
+                    break;
+                case Stage::Release:
+                    break;
+                }
+                if(stabilizeTime == 0)
+                {
+                    velocityAmplifier->advanceTime(deltaTime);
+                    return;
+                }
+            }
+            else
+            {
+                velocityAmplifier->advanceTime(deltaTime);
+                return;
+            }
+        }
     }
 };
 

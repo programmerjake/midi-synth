@@ -14,40 +14,31 @@ int main()
     grand_piano_D_Sharp->looped = true;
     grand_piano_D_Sharp->loopStart = 116756;
     grand_piano_D_Sharp->data.resize(123288);
-    auto sound1 = make_shared<SampledAudioSource>(grand_piano_D_Sharp);
-    auto sound2 = make_shared<TimeScaleAudioSource>(sound1, 1.0 / getKeyFrequency(63));
-    auto sound3 = make_shared<MixAudioSource>();
-    sound3->addSource(sound2, 1);
-    auto modulatedSound = make_shared<TimeScaleAudioSource>(sound3, getKeyFrequency(60));
-    auto sound = make_shared<AmplifyAudioSource>(modulatedSound, 1.0);
+    grand_piano_D_Sharp->loopDecayAmplitude = 0.97;
+    auto make_piano_note = [=](int key, int velocity)->shared_ptr<MidiKey>
+    {
+        return make_shared<GenericMidiKey>(key, velocity, 0, make_shared<SampledAudioSource>(grand_piano_D_Sharp), 63, GenericMidiKey::InstantaneousAttack, 1, 0, 5, 0.5, 0, 0, 1, 1);
+    };
     auto finalMixer = make_shared<MixAudioSource>();
-    auto eventDispatcher = make_shared<EventDispatcherAudioSource>();
-    finalMixer->addSource(eventDispatcher, 1);
-    finalMixer->addSource(sound, 1);
+    auto eventDispatcher = make_shared<EventDispatcherAudioSource>(finalMixer);
     {
         static EventDispatcherAudioSource::EventFn eventFn;
         eventFn = [=]()
         {
-            static bool isHighNote = true;
-            modulatedSound->setScale(getKeyFrequency(isHighNote ? 72 : 60), 3);
-            isHighNote = !isHighNote;
-            eventDispatcher->scheduleEvent(0.5, eventFn);
+            static int noteNumber = 60;
+            static shared_ptr<MidiKey> key = nullptr;
+            if(key)
+                key->stop();
+            if(noteNumber <= 72)
+                finalMixer->addSource(key = make_piano_note(noteNumber, defaultVelocity), 0.1);
+            noteNumber++;
+            if(noteNumber - 1 <= 72)
+                eventDispatcher->scheduleEvent(0.125, eventFn);
         };
-        eventDispatcher->scheduleEvent(0.5, eventFn);
-    }
-    {
-        static EventDispatcherAudioSource::EventFn eventFn2;
-        eventFn2 = [=]()
-        {
-            static bool isHighAmplitude = false;
-            sound->setAmplitude(isHighAmplitude ? 1 : 0.3, 3, AmplifyAudioSource::ScaleType::Exponential);
-            isHighAmplitude = !isHighAmplitude;
-            eventDispatcher->scheduleEvent(1, eventFn2);
-        };
-        eventDispatcher->scheduleEvent(1, eventFn2);
+        eventDispatcher->scheduleEvent(0.01, eventFn);
     }
     auto audioOutput = makeDeviceAudioOutput();
-    audioOutput->bind(finalMixer);
+    audioOutput->bind(eventDispatcher);
     cout << "Running...\nPress enter to exit." << endl;
     cin.get();
     return 0;
