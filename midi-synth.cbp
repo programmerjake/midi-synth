@@ -49,6 +49,7 @@
 		<Unit filename="audio_source.h" />
 		<Unit filename="main.cpp" />
 		<Unit filename="midi_channel.h" />
+		<Unit filename="midi_instrument_provider.h" />
 		<Unit filename="midi_key.cpp" />
 		<Unit filename="midi_key.h" />
 		<Unit filename="util.h" />

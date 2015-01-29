@@ -71,7 +71,7 @@ public:
                 desired.callback = &audioCallback;
                 desired.channels = (size_t)AudioChannel::Last + 1;
                 desired.format = AUDIO_S16SYS;
-                desired.freq = 96000;
+                desired.freq = 44100;
                 desired.samples = 4096;
                 desired.userdata = (void *)this;
                 audioDeviceID = SDL_OpenAudioDevice(nullptr, 0, &desired, &audioSpec, SDL_AUDIO_ALLOW_FREQUENCY_CHANGE);

@@ -10,6 +10,8 @@
 #include <functional>
 #include "util.h"
 #include <cassert>
+#include <list>
+#include <iterator>
 #include "audio_data.h"
 
 class AudioSource
@@ -200,144 +202,101 @@ public:
     }
 };
 
-class MixAudioSource : public AudioSource
+template <typename T, typename ChildClass>
+class CombineAudioSource : public AudioSource
 {
-    struct SourceStruct
-    {
-        std::shared_ptr<AudioSource> source;
-        float amplitude;
-        SourceStruct *next;
-        SourceStruct(std::shared_ptr<AudioSource> source, float amplitude, SourceStruct *next)
-            : source(std::move(source)), amplitude(amplitude), next(next)
-        {
-        }
-    };
-    SourceStruct *head;
 public:
-    MixAudioSource()
-        : head(nullptr)
+    typedef T value_type;
+    typedef typename std::list<value_type>::const_iterator iterator;
+    typedef iterator const_iterator;
+private:
+    std::list<value_type> sources;
+public:
+    template <typename ...Args>
+    iterator insert(std::shared_ptr<AudioSource> source, Args ...args)
     {
+        if(source == nullptr)
+            return sources.cend();
+        return sources.insert(sources.end(), value_type(std::move(source), std::forward<Args>(args)...));
     }
-    virtual ~MixAudioSource()
+    iterator insert(value_type source)
     {
-        while(head != nullptr)
+        if(std::get<0>(source) == nullptr)
+            return sources.cend();
+        return sources.insert(sources.end(), std::move(source));
+    }
+    bool erase(std::shared_ptr<AudioSource> source)
+    {
+        for(auto i = sources.begin(); i != sources.end(); i++)
         {
-            SourceStruct *deleteMe = head;
-            head = head->next;
-            delete deleteMe;
-        }
-    }
-    void addSource(std::shared_ptr<AudioSource> source, double amplitude)
-    {
-        head = new SourceStruct(std::move(source), amplitude, head);
-    }
-    void removeSource(std::shared_ptr<AudioSource> source)
-    {
-        for(SourceStruct **pnode = &head; *pnode != nullptr; pnode = &(*pnode)->next)
-        {
-            if((*pnode)->source == source)
+            if(std::get<0>(*i) == source)
             {
-                SourceStruct *node = *pnode;
-                *pnode = node->next;
-                delete node;
-                break;
+                sources.erase(i);
+                return true;
             }
         }
+        return false;
+    }
+    iterator erase(iterator pos)
+    {
+        if(pos == sources.end())
+            return sources.cend();
+        return sources.erase(pos);
+    }
+    iterator begin() const
+    {
+        return sources.cbegin();
+    }
+    iterator end() const
+    {
+        return sources.cend();
     }
     void advanceTime(double deltaTime) override
     {
-        for(SourceStruct *node = head; node != nullptr; node = node->next)
+        for(const value_type &node : sources)
         {
-            node->source->advanceTime(deltaTime);
+            std::get<0>(node)->advanceTime(deltaTime);
         }
     }
-    float getCurrentSample(AudioChannel channel) override
-    {
-        float retval = 0;
-        for(SourceStruct *node = head; node != nullptr; node = node->next)
-        {
-            retval += node->amplitude * node->source->getCurrentSample(channel);
-        }
-        return retval;
-    }
+    float getCurrentSample(AudioChannel channel) override = 0;
     virtual std::shared_ptr<AudioSource> duplicate() const override
     {
-        auto retval = std::shared_ptr<MixAudioSource>(new MixAudioSource);
-        for(const SourceStruct *node = head; node != nullptr; node = node->next)
+        auto retval = std::shared_ptr<CombineAudioSource>(new ChildClass);
+        for(const value_type &node : sources)
         {
-            retval->addSource(node->source->duplicate(), node->amplitude);
+            value_type newNode = node;
+            std::get<0>(newNode) = std::get<0>(node)->duplicate();
+            retval->insert(newNode);
         }
         return std::move(retval);
     }
 };
 
-class ModulateAudioSource : public AudioSource
+class MixAudioSource : public CombineAudioSource<std::tuple<std::shared_ptr<AudioSource>, float>, MixAudioSource>
 {
-    struct SourceStruct
-    {
-        std::shared_ptr<AudioSource> source;
-        SourceStruct *next;
-        SourceStruct(std::shared_ptr<AudioSource> source, SourceStruct *next)
-            : source(std::move(source)), next(next)
-        {
-        }
-    };
-    SourceStruct *head;
 public:
-    ModulateAudioSource()
-        : head(nullptr)
-    {
-    }
-    virtual ~ModulateAudioSource()
-    {
-        while(head != nullptr)
-        {
-            SourceStruct *deleteMe = head;
-            head = head->next;
-            delete deleteMe;
-        }
-    }
-    void addSource(std::shared_ptr<AudioSource> source)
-    {
-        head = new SourceStruct(std::move(source), head);
-    }
-    void removeSource(std::shared_ptr<AudioSource> source)
-    {
-        for(SourceStruct **pnode = &head; *pnode != nullptr; pnode = &(*pnode)->next)
-        {
-            if((*pnode)->source == source)
-            {
-                SourceStruct *node = *pnode;
-                *pnode = node->next;
-                delete node;
-                break;
-            }
-        }
-    }
-    void advanceTime(double deltaTime) override
-    {
-        for(SourceStruct *node = head; node != nullptr; node = node->next)
-        {
-            node->source->advanceTime(deltaTime);
-        }
-    }
     float getCurrentSample(AudioChannel channel) override
     {
-        float retval = 1;
-        for(SourceStruct *node = head; node != nullptr; node = node->next)
+        float retval = 0;
+        for(const value_type &node : *this)
         {
-            retval *= node->source->getCurrentSample(channel);
+            retval += std::get<1>(node) * std::get<0>(node)->getCurrentSample(channel);
         }
         return retval;
     }
-    virtual std::shared_ptr<AudioSource> duplicate() const override
+};
+
+class ModulateAudioSource : public CombineAudioSource<std::tuple<std::shared_ptr<AudioSource>>, ModulateAudioSource>
+{
+public:
+    float getCurrentSample(AudioChannel channel) override
     {
-        auto retval = std::shared_ptr<ModulateAudioSource>(new ModulateAudioSource);
-        for(const SourceStruct *node = head; node != nullptr; node = node->next)
+        float retval = 1;
+        for(const value_type &node : *this)
         {
-            retval->addSource(node->source->duplicate());
+            retval *= std::get<0>(node)->getCurrentSample(channel);
         }
-        return std::move(retval);
+        return retval;
     }
 };
 
@@ -445,6 +404,33 @@ public:
         auto retval = std::make_shared<AmplifyAudioSource>(source->duplicate(), amplitude);
         retval->setAmplitude(newAmplitude, amplitudeSpeed, scaleType);
         return std::move(retval);
+    }
+};
+
+class PanAudioSource : public AudioSource
+{
+private:
+    std::shared_ptr<AudioSource> source;
+    array_AudioChannel<float> channelAmplitudes;
+public:
+    PanAudioSource(std::shared_ptr<AudioSource> source, array_AudioChannel<float> channelAmplitudes)
+        : source(std::move(source)), channelAmplitudes(channelAmplitudes)
+    {
+    }
+    void advanceTime(double deltaTime) override
+    {
+        source->advanceTime(deltaTime);
+    }
+    float getCurrentSample(AudioChannel channel) override
+    {
+        std::size_t c = (std::size_t)channel;
+        if(c >= channelAmplitudes.size())
+            return source->getCurrentSample(channel);
+        return channelAmplitudes[c] * source->getCurrentSample(channel);
+    }
+    virtual std::shared_ptr<AudioSource> duplicate() const override
+    {
+        return std::make_shared<PanAudioSource>(source->duplicate(), channelAmplitudes);
     }
 };
 
@@ -610,6 +596,22 @@ public:
     virtual std::shared_ptr<AudioSource> duplicate() const override
     {
         return std::shared_ptr<AudioSource>(new SampledAudioSource(data, currentSample, amplitude));
+    }
+};
+
+class SilenceAudioSource : public AudioSource
+{
+public:
+    void advanceTime(double deltaTime) override
+    {
+    }
+    float getCurrentSample(AudioChannel channel) override
+    {
+        return 0;
+    }
+    virtual std::shared_ptr<AudioSource> duplicate() const override
+    {
+        return std::shared_ptr<AudioSource>(new SilenceAudioSource);
     }
 };
 

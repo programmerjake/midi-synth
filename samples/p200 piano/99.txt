@@ -1,0 +1,6 @@
+#sourceBaseKey attackSpeed decaySpeed sustainSpeed releaseSpeed releaseSpeedVariance slideSpeed aftertouchSpeed attackAmplitude decayAmplitude loopStart loopEnd loopDecayAmplitude startKey endKey
+ 99            -1          1          0            5            0                    0          0               1               1              17820     18113   0.98               95       99
+99-L.ogg
+1 0
+99-R.ogg
+0 1

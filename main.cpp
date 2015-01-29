@@ -3,40 +3,114 @@
 #include <mutex>
 #include <chrono>
 #include "audio_output.h"
-#include "midi_key.h"
+#include "midi_channel.h"
 #include "audio_data.h"
 
 using namespace std;
 
 int main()
 {
-    auto grand_piano_D_Sharp = loadFromOgg("samples/grand-piano/D#3.ogg");
-    grand_piano_D_Sharp->looped = true;
-    grand_piano_D_Sharp->loopStart = 116756;
-    grand_piano_D_Sharp->data.resize(123288);
-    grand_piano_D_Sharp->loopDecayAmplitude = 0.97;
-    auto make_piano_note = [=](int key, int velocity)->shared_ptr<MidiKey>
-    {
-        return make_shared<GenericMidiKey>(key, velocity, 0, make_shared<SampledAudioSource>(grand_piano_D_Sharp), 63, GenericMidiKey::InstantaneousAttack, 1, 0, 5, 0.5, 0, 0, 1, 1);
-    };
+    auto instrument = loadFromDirectory("samples/p200 piano");
+    auto channel = make_shared<MidiChannel>(instrument);
     auto finalMixer = make_shared<MixAudioSource>();
     auto eventDispatcher = make_shared<EventDispatcherAudioSource>(finalMixer);
-    {
-        static EventDispatcherAudioSource::EventFn eventFn;
-        eventFn = [=]()
-        {
-            static int noteNumber = 60;
-            static shared_ptr<MidiKey> key = nullptr;
-            if(key)
-                key->stop();
-            if(noteNumber <= 72)
-                finalMixer->addSource(key = make_piano_note(noteNumber, defaultVelocity), 0.1);
-            noteNumber++;
-            if(noteNumber - 1 <= 72)
-                eventDispatcher->scheduleEvent(0.125, eventFn);
-        };
-        eventDispatcher->scheduleEvent(0.01, eventFn);
-    }
+    double t = 0;
+
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOn(60, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.25, [=](){channel->noteOff(60, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOn(62, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.25, [=](){channel->noteOff(62, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOn(69, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.5, [=](){channel->noteOff(69, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOn(60, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.25, [=](){channel->noteOff(60, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOn(62, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.25, [=](){channel->noteOff(62, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOn(67, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.5, [=](){channel->noteOff(67, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOn(60, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.25, [=](){channel->noteOff(60, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOn(62, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.25, [=](){channel->noteOff(62, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOn(69, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.5, [=](){channel->noteOff(69, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOn(62, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.25, [=](){channel->noteOff(62, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOn(60, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.25, [=](){channel->noteOff(60, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOn(67, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.5, [=](){channel->noteOff(67, defaultVelocity);});
+
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOn(60, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOn(45, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.25, [=](){channel->noteOff(60, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOn(62, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.25, [=](){channel->noteOff(62, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOff(45, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOn(69, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOn(50, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.5, [=](){channel->noteOff(69, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOff(50, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOn(60, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOn(45, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.25, [=](){channel->noteOff(60, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOn(62, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.25, [=](){channel->noteOff(62, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOff(45, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOn(67, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOn(48, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.5, [=](){channel->noteOff(67, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOff(48, defaultVelocity);});
+
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOn(60, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOn(45, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.25, [=](){channel->noteOff(60, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOn(62, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.25, [=](){channel->noteOff(62, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOff(45, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOn(69, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOn(50, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.5, [=](){channel->noteOff(69, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOff(50, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOn(60, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOn(45, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.25, [=](){channel->noteOff(60, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOff(45, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOn(43, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOn(62, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.25, [=](){channel->noteOff(62, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOff(43, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOn(67, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOn(48, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.5, [=](){channel->noteOff(67, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOff(48, defaultVelocity);});
+
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOn(60, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.25, [=](){channel->noteOff(60, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOn(62, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.25, [=](){channel->noteOff(62, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOn(69, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.5, [=](){channel->noteOff(69, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOn(60, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.25, [=](){channel->noteOff(60, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOn(62, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.25, [=](){channel->noteOff(62, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOn(67, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.5, [=](){channel->noteOff(67, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOn(60, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.25, [=](){channel->noteOff(60, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOn(62, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.25, [=](){channel->noteOff(62, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOn(69, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.5, [=](){channel->noteOff(69, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOn(62, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.25, [=](){channel->noteOff(62, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOn(60, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.25, [=](){channel->noteOff(60, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.0, [=](){channel->noteOn(67, defaultVelocity);});
+    eventDispatcher->scheduleEvent(t += 0.5, [=](){channel->noteOff(67, defaultVelocity);});
+
+    finalMixer->insert(channel, 0.3);
     auto audioOutput = makeDeviceAudioOutput();
     audioOutput->bind(eventDispatcher);
     cout << "Running...\nPress enter to exit." << endl;
